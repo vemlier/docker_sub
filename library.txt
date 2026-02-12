@@ -9,9 +9,9 @@
       description => 'Deep learning framework',
       versions => ['2.16.1', '2.13.0']
     },
-    'pytorch' => {
+    'torch' => {
       description => 'Superpower machine learning library',
-      versions => ['2.10.0', '2.8.0']
+      versions => ['2.10.0', '2.4.0']
     }
   }
 }

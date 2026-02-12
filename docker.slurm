@@ -136,9 +136,11 @@ if ( !-f $library_information || !-r $library_information ) {
 
 $docker_cmd =
 "docker run --rm -v $pwd:$pwd -w $pwd --name \$SLURM_JOB_ID --hostname d_\$SLURMD_NODENAME ";
+$docker_cmd .= "-v /etc/passwd:/etc/passwd -v /etc/group:/etc/group ";
 $docker_cmd .= "--gpus $gpu_num "  if ( $gpu_num > 0 );
 $docker_cmd .= "-it "              if ( !defined $batch_mode );
 $docker_cmd .= "-p \$PORT:\$PORT " if ( defined $jupyter_mode );
+$docker_cmd .= "--user \$(id -u):\$(id -g) ";
 
 # Manual port option
 # $docker_cmd .= "-p 8888:\$PORT "    if ( defined $jupyter_mode );
@@ -160,7 +162,7 @@ else {
         $docker_cmd .= "tail -f /dev/null";
     }
     else {
-        $docker_cmd .= "bash -c \"/bin/bash\"";
+        $docker_cmd .= "bash -c \"/bin/bash --login\"";
     }
 }
 
