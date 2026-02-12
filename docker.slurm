@@ -26,6 +26,7 @@ my $batch_mode;
 my $jupyter_mode;
 my $debug_mode;
 my $docker_cmd;
+my $registry = exists $ENV{'DEEPONE_REGISTRY'} ? $ENV{'DEEPONE_REGISTRY'} : undef;
 my $sbatch;
 my $batch           = "slurm.sub";
 my $jupyter_setting = "jupyter.txt";
@@ -54,6 +55,7 @@ GetOptions(
     'g|gpu=i'       => \$gpu_num,
     's|shared'      => \$shared_mode,
     'i|image=s'     => \$docker_image,
+    'r|registry=s'  => \$registry,
     'j|jupyter'     => \$jupyter_mode,
     'd|debug'       => \$debug_mode,
     'h|help'        => sub { usage() }
@@ -86,14 +88,16 @@ for ( my $i = 0 ; $i < @ARGV ; $i++ ) {
 
         my $container = $ARGV[ $i + 1 ]
           or die "ERROR: container name required\n";
-        chomp( my $exec_host = `squeue -h -o %N --job $container` );
-        if ( $exec_host ne "" ) {
+        my ($docker_user, $exec_host) = split ' ', `squeue -h -o "%u %N" --job $container`;
+	chomp($docker_user) if ($docker_user);
+	chomp($exec_host) if ($exec_host);
+        if ( $exec_host ne "" && $docker_user eq $user ) {
             if ( $exec_host eq $hostname ) {
-                $system_cmd = "docker exec -it $container /bin/bash";
+                $system_cmd = "docker exec -it $container /bin/bash --login";
             }
             else {
                 $system_cmd =
-                  "ssh -t $exec_host docker exec -it $container /bin/bash";
+                  "ssh -t $exec_host docker exec -it $container /bin/bash --login";
             }
         }
         else {
@@ -108,10 +112,10 @@ for ( my $i = 0 ; $i < @ARGV ; $i++ ) {
     elsif ( $ARGV[$i] eq 'kill' ) {
         my $container = $ARGV[ $i + 1 ]
           or die "ERROR: container name required\n";
-        chomp( my $exec_host =
-`scontrol show hostnames \$(squeue -h -o %N --job $container) | head -n 1`
-        );
-        if ( $exec_host ne "" ) {
+        my ($docker_user, $exec_host) = split ' ', `squeue -h -o "%u %N" --job $container`;
+	chomp($docker_user) if ($docker_user);
+	chomp($exec_host) if ($exec_host);
+        if ( $exec_host ne "" && $docker_user eq $user ) {
             if ( $exec_host eq $hostname ) {
                 $system_cmd = "docker rm -f $container";
             }
@@ -144,7 +148,11 @@ $docker_cmd .= "--user \$(id -u):\$(id -g) ";
 
 # Manual port option
 # $docker_cmd .= "-p 8888:\$PORT "    if ( defined $jupyter_mode );
-$docker_cmd .= "$docker_image ";
+if ($registry) {
+  $docker_cmd .= "$registry/$docker_image ";
+} else {
+  $docker_cmd .= "$docker_image ";
+}
 
 if ($jupyter_mode) {
     $docker_cmd .= "bash -c \"exec jupyter notebook \\
@@ -240,6 +248,8 @@ if ($debug_mode) {
       if exists $ENV{'DEEPONE_DOCKER_IMAGE'};
     print "DEEPONE_GPU_NUM: $ENV{'DEEPONE_GPU_NUM'}\n"
       if exists $ENV{'DEEPONE_GPU_NUM'};
+    print "DEEPONE_REGISTRY: $ENV{'DEEPONE_REGISTRY'}\n"
+      if exists $ENV{'DEEPONE_REGISTRY'};
     print "=====Your Enviroment variables=====\n";
     print "\n";
     print "=====Docker command=====\n";
@@ -279,6 +289,7 @@ Usage: docker.slurm -n <cpu_num> -g <gpu_num> -p <submit_partition> -m <submit_h
   -s  : Use GPU shared mode
   -j  : Jupyter notebook mode
   -i  : Docker image ( @docker_images ) (DEEPONE_DOCKER_IMAGE)
+  -r  : Docker private registry (DEEPONE_REGISTRY)
   -d  : Run debug mode
 
   list          : list docker images
