@@ -1,0 +1,17 @@
+{
+  python => ['3.12.12'],
+  libraries => {
+    'sklearn' => {
+      description => 'Classical machine learning library',
+      versions => ['1.8.0', '1.6.0', '1.4.0']
+    },
+    'tensorflow' => {
+      description => 'Deep learning framework',
+      versions => ['2.16.1', '2.13.0']
+    },
+    'pytorch' => {
+      description => 'Superpower machine learning library',
+      versions => ['2.10.0', '2.8.0']
+    }
+  }
+}

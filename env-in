@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+export DEEPONE_DOCKER_IMAGE=sklearn:1.6.1
+export DEEPONE_CPU_NUM=1
+export DEEPONE_GPU_NUM=2
