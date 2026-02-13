@@ -23,14 +23,16 @@ my $gpu_num = exists $ENV{'DEEPONE_GPU_NUM'} ? $ENV{'DEEPONE_GPU_NUM'} : 0;
 my $gpu_mode = "exclusive_process";
 my $shared_mode;
 my $batch_mode;
+my $wait_limit;
 my $jupyter_mode;
 my $debug_mode;
 my $docker_cmd;
-my $registry = exists $ENV{'DEEPONE_REGISTRY'} ? $ENV{'DEEPONE_REGISTRY'} : undef;
+my $registry =
+  exists $ENV{'DEEPONE_REGISTRY'} ? $ENV{'DEEPONE_REGISTRY'} : undef;
 my $bsub;
-my $batch = "lsf.sub";
+my $batch       = "lsf.sub";
 my $passwd_file = "passwd.temp";
-my $group_file = "group.temp";
+my $group_file  = "group.temp";
 my $system_cmd;
 my @python_versions;
 my @docker_images;
@@ -55,6 +57,7 @@ GetOptions(
     'n|cpu=i'      => \$cpu_num,
     'g|gpu=i'      => \$gpu_num,
     's|shared'     => \$shared_mode,
+    'w|wait=s'     => \$wait_limit,
     'i|image=s'    => \$docker_image,
     'r|registry=s' => \$registry,
     'j|jupyter'    => \$jupyter_mode,
@@ -89,16 +92,17 @@ for ( my $i = 0 ; $i < @ARGV ; $i++ ) {
 
         my $container = $ARGV[ $i + 1 ]
           or die "ERROR: container name required\n";
-        my ($docker_user, $exec_host) = split ' ', `bjobs -o "user exec_host" -noheader $container`;
-	chomp($docker_user) if ($docker_user);
-	chomp($exec_host) if ($exec_host);
+        my ( $docker_user, $exec_host ) = split ' ',
+          `bjobs -o "user exec_host" -noheader $container`;
+        chomp($docker_user) if ($docker_user);
+        chomp($exec_host)   if ($exec_host);
         if ( $exec_host ne "" && $docker_user eq $user ) {
             if ( $exec_host eq $hostname ) {
                 $system_cmd = "docker exec -it $container /bin/bash --login";
             }
             else {
                 $system_cmd =
-                  "ssh -t $exec_host docker exec -it $container /bin/bash --login";
+"ssh -t $exec_host docker exec -it $container /bin/bash --login";
             }
         }
         else {
@@ -113,9 +117,10 @@ for ( my $i = 0 ; $i < @ARGV ; $i++ ) {
     elsif ( $ARGV[$i] eq 'kill' ) {
         my $container = $ARGV[ $i + 1 ]
           or die "ERROR: container name required\n";
-        my ($docker_user, $exec_host) = split ' ', `bjobs -o "user exec_host" -noheader $container`;
-	chomp($docker_user) if ($docker_user);
-	chomp($exec_host) if ($exec_host);
+        my ( $docker_user, $exec_host ) = split ' ',
+          `bjobs -o "user exec_host" -noheader $container`;
+        chomp($docker_user) if ($docker_user);
+        chomp($exec_host)   if ($exec_host);
         if ( $exec_host ne "" && $docker_user eq $user ) {
             if ( $exec_host eq $hostname ) {
                 $system_cmd = "docker rm -f $container";
@@ -140,7 +145,8 @@ if ( !-f $library_information || !-r $library_information ) {
 
 $docker_cmd =
 "docker run --rm -v $pwd:$pwd -w $pwd --name \$LSB_JOBID --hostname d_\$HOSTNAME ";
-$docker_cmd .= "-v $pwd/$passwd_file:/etc/passwd -v $pwd/$group_file:/etc/group ";
+$docker_cmd .=
+  "-v $pwd/$passwd_file:/etc/passwd -v $pwd/$group_file:/etc/group ";
 $docker_cmd .= "--gpus $gpu_num "  if ( $gpu_num > 0 );
 $docker_cmd .= "-it "              if ( !defined $batch_mode );
 $docker_cmd .= "-p \$PORT:\$PORT " if ( defined $jupyter_mode );
@@ -149,9 +155,10 @@ $docker_cmd .= "--user \$(id -u):\$(id -g) ";
 # Manual Port Option
 #$docker_cmd .= "-p 8888:\$PORT "    if ( defined $jupyter_mode );
 if ($registry) {
-  $docker_cmd .= "$registry/$docker_image ";
-} else {
-  $docker_cmd .= "$docker_image ";
+    $docker_cmd .= "$registry/$docker_image ";
+}
+else {
+    $docker_cmd .= "$docker_image ";
 }
 if ($jupyter_mode) {
     $docker_cmd .= "bash -c \"exec jupyter notebook \\
@@ -182,6 +189,7 @@ $bsub .= "#BSUB -q $queue\n" if ( defined $queue );
 $bsub .= "#BSUB -m $host\n" if ( defined $host );
 $bsub .= "#BSUB -n $cpu_num\n";
 $bsub .= "#BSUB -gpu \"num=$gpu_num:mode=$gpu_mode\"\n" if ( $gpu_num > 0 );
+$bsub .= "#BSUB -w $wait_limit\n" if ($wait_limit);
 
 if ($batch_mode) {
 
@@ -243,29 +251,30 @@ else {
 }
 
 system("rm -f $passwd_file") if ( -e "$passwd_file" );
-system("rm -f $group_file") if ( -e "$group_file" );
+system("rm -f $group_file")  if ( -e "$group_file" );
 
 sub usage {
     print << "EOF";
 =========================================================
 docker.lsf 1.0
 =========================================================
-Usage: docker.lsf -n <cpu_num> -g <gpu_num> -q <submit_queue> -m <submit_host> -i <docker_image>
+Usage: docker.lsf [-b] [-d] [-n <cpu_num>] [-g <gpu_num>] [-q <submit_queue>] [-m <submit_host>] -i <docker_image> "commnad"
        docker.lsf list
        docker.lsf exec <JobID>
        docker.lsf kill <JobID>
 
-  -b  : Batch mode ( Default: Interactive )
-  -J  : Job name  ( Default: myjob)
-  -q  : Sumit queue
-  -m  : Sumit host
-  -n  : Number of cpu ( Default: 1, DEEPONE_CPU_NUM )
-  -g  : Number of gpu ( Default: 0, DEEPONE_GPU_NUM )
-  -s  : Use GPU shared mode
-  -j  : Jupyter notebook mode
-  -i  : Docker image ( @docker_images ) (DEEPONE_DOCKER_IMAGE)
-  -r  : Docker private registry (DEEPONE_REGISTRY)
-  -d  : Run debug mode
+  -b                 : Batch mode ( Default: Interactive )
+  -J <job name>      : Job name  ( Default: myjob)
+  -q <queue>         : Sumit queue
+  -m <host>          : Sumit host
+  -n <cpu num>       : Number of CPU ( Default: 1, DEEPONE_CPU_NUM )
+  -g <gpu num>       : Number of GPU ( Default: 0, DEEPONE_GPU_NUM )
+  -s                 : Use GPU shared mode
+  -w <string>        : Use Job Dependancy
+  -j                 : Jupyter notebook mode
+  -i <docker_images> : Docker image ( @docker_images ) (DEEPONE_DOCKER_IMAGE)
+  -r <registry>      : Docker private registry (DEEPONE_REGISTRY)
+  -d                 : Run debug mode
 
   list          : list docker images
   exec <JobID>  : Go to docker container ( Need ssh ) 

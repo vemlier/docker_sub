@@ -4,3 +4,5 @@ gpu_busy_multi
 *.slurmlog
 *.lslog
 *.swp
+*.setting
+*.temp

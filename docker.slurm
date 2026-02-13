@@ -23,6 +23,7 @@ my $gpu_num = exists $ENV{'DEEPONE_GPU_NUM'} ? $ENV{'DEEPONE_GPU_NUM'} : 0;
 my $gpu_mode = "gpu";
 my $shared_mode;
 my $batch_mode;
+my $wait_limit;
 my $jupyter_mode;
 my $debug_mode;
 my $docker_cmd;
@@ -57,6 +58,7 @@ GetOptions(
     'n|cpu=i'       => \$cpu_num,
     'g|gpu=i'       => \$gpu_num,
     's|shared'      => \$shared_mode,
+    'w|wait=s'      => \$wait_limit,
     'i|image=s'     => \$docker_image,
     'r|registry=s'  => \$registry,
     'j|jupyter'     => \$jupyter_mode,
@@ -188,6 +190,7 @@ $sbatch .= "#SBATCH -p $partition\n" if ( defined $partition );
 $sbatch .= "#SBATCH -w $host\n" if ( defined $host );
 $sbatch .= "#SBATCH -n $cpu_num\n";
 $sbatch .= "#SBATCH --gres=$gpu_mode:$gpu_num\n" if ( $gpu_num > 0 );
+$sbatch .= "#SBATCH -d $wait_limit\n" if ( $wait_limit );
 
 if ($batch_mode) {
 
@@ -206,6 +209,7 @@ else {
     $system_cmd .= "-w $host " if ( defined $host );
     $system_cmd .= "-n $cpu_num ";
     $system_cmd .= "--gres=$gpu_mode:$gpu_num " if ( $gpu_num > 0 );
+    $system_cmd .= "-d $wait_limit " if ( $wait_limit );
         open my $ACCOUNT, ">", $account_setting
           or die "Cannot open $account_setting: $!";
         print $ACCOUNT <<EOF;
@@ -298,22 +302,24 @@ sub usage {
 =========================================================
 docker.slurm 1.0
 =========================================================
-Usage: docker.slurm -n <cpu_num> -g <gpu_num> -p <submit_partition> -m <submit_host> -i <docker_image>
+Usage: docker.slurm [-b] [-d] [-n <cpu_num>] [-g <gpu_num>] [-p <submit_partition>] [-m <submit_host>] -i <docker_image> "commnad"
        docker.slurm list
        docker.slurm exec <JobID>
        docker.slurm kill <JobID>
 
-  -b  : Batch mode ( Default: Interactive )
-  -J  : Job name  ( Default: myjob)
-  -p  : Sumit partition
-  -m  : Sumit host
-  -n  : Number of cpu ( Default: 1, DEEPONE_CPU_NUM )
-  -g  : Number of gpu ( Default: 0, DEEPONE_GPU_NUM )
-  -s  : Use GPU shared mode
-  -j  : Jupyter notebook mode
-  -i  : Docker image ( @docker_images ) (DEEPONE_DOCKER_IMAGE)
-  -r  : Docker private registry (DEEPONE_REGISTRY)
-  -d  : Run debug mode
+
+  -b                 : Batch mode ( Default: Interactive )
+  -J <job name>      : Job name  ( Default: myjob)
+  -p <partition>     : Sumit partition
+  -m <host>          : Sumit host
+  -n <cpu num>       : Number of CPU ( Default: 1, DEEPONE_CPU_NUM )
+  -g <gpu num>       : Number of GPU ( Default: 0, DEEPONE_GPU_NUM )
+  -s                 : Use GPU shared mode
+  -w <string>        : Use Job Dependancy
+  -j                 : Jupyter notebook mode
+  -i <docker_images> : Docker image ( @docker_images ) (DEEPONE_DOCKER_IMAGE)
+  -r <registry>      : Docker private registry (DEEPONE_REGISTRY)
+  -d                 : Run debug mode
 
   list          : list docker images
   exec <JobID>  : Go to docker container ( Need ssh ) 
