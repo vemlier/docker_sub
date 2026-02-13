@@ -223,6 +223,9 @@ $bsub .= "getent group  > $group_file\n";
 $bsub .= "\n";
 $bsub .= $docker_cmd;
 $bsub .= "\n";
+$bsub .= "rm -f $passwd_file\n";
+$bsub .= "rm -f $group_file\n";
+$bsub .= "\n";
 
 if ($debug_mode) {
     print "\n";
@@ -249,9 +252,6 @@ else {
     print $BSUB $bsub;
     close $BSUB;
 }
-
-system("rm -f $passwd_file") if ( -e "$passwd_file" );
-system("rm -f $group_file")  if ( -e "$group_file" );
 
 sub usage {
     print << "EOF";

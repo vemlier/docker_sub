@@ -32,8 +32,6 @@ my $sbatch;
 my $batch = "slurm.sub";
 my $passwd_file = "passwd.temp";
 my $group_file = "group.temp";
-my $account_setting = "account.setting";
-my $jupyter_setting = "jupyter.txt";
 my $system_cmd;
 my @python_versions;
 my @docker_images;
@@ -198,7 +196,7 @@ if ($batch_mode) {
     $sbatch .= "#SBATCH -o %j.slurmlog\n";
     $sbatch .= "#SBATCH -e %j.slurmlog\n";
 
-    # for Jupyter notebook url
+    # For Jupyter notebook url
     #  $sbatch .= "#SBATCH -e %j.slurmerror\n";
 }
 else {
@@ -210,37 +208,19 @@ else {
     $system_cmd .= "-n $cpu_num ";
     $system_cmd .= "--gres=$gpu_mode:$gpu_num " if ( $gpu_num > 0 );
     $system_cmd .= "-d $wait_limit " if ( $wait_limit );
-        open my $ACCOUNT, ">", $account_setting
-          or die "Cannot open $account_setting: $!";
-        print $ACCOUNT <<EOF;
-#!/usr/bin/env bash
-getent passwd > $passwd_file
-getent group > $group_file
-EOF
-        close $ACCOUNT;
 
     if ($jupyter_mode) {
-        open my $JUPYTER, ">", $jupyter_setting
-          or die "Cannot open $jupyter_setting: $!";
-
-        print $JUPYTER <<'EOF';
-#!/usr/bin/env bash
-export IP=$(hostname -I | awk '{print $1}')
-export PORT=$(echo $SLURM_JOB_ID | tail -c 5)
-while [ ${#PORT} -lt 4 ]; do
-    export PORT="9$PORT"
-done
-EOF
-        close $JUPYTER;
-        # $system_cmd .= "--pty bash -c 'bash $account_setting && rm -f $account_setting && source $jupyter_setting && rm -f $jupyter_setting && $docker_cmd'";
-        # For none shared file system
-        $system_cmd .= "--pty bash -c 'source $jupyter_setting && rm -f $jupyter_setting && $docker_cmd'";
-      
+        $system_cmd .= "--pty bash -c 'getent passwd > $passwd_file && \\
+getent group > $group_file && \\
+export IP=\$(hostname -I | awk \"{print \\\$1}\") && \\
+export PORT=\$(echo \$SLURM_JOB_ID | tail -c 5) && \\
+while [ \${#PORT} -lt 4 ]; do export PORT=\"9\$PORT\"; done && \\
+exec $docker_cmd'"; 
     }
     else {
-        # $system_cmd .= "--pty bash -c 'bash $account_setting && rm -f $account_setting && $docker_cmd'";
-        # For none shared file system
-        $system_cmd .= "--pty bash -c '$docker_cmd'";
+        $system_cmd .= "--pty bash -c 'getent passwd > $passwd_file && \\
+getent group > $group_file && \\
+exec $docker_cmd'";
     }
 }
 
@@ -259,6 +239,9 @@ $sbatch .= "\n";
 $sbatch .= "getent passwd > $passwd_file\n";
 $sbatch .= "getent group  > $group_file\n";
 $sbatch .= $docker_cmd;
+$sbatch .= "\n";
+$sbatch .= "rm -f $passwd_file\n";
+$sbatch .= "rm -f $group_file\n";
 $sbatch .= "\n";
 
 open my $SBATCH, ">$batch" or die "Cannot open $batch $!";
@@ -284,18 +267,15 @@ if ($debug_mode) {
     print $system_cmd, "\n" if ( defined $system_cmd );
     print "=====System command=====\n" if ( defined $system_cmd );
     print "\n";
-    system("rm -f $account_setting") if ( -e "$account_setting" );
 }
 elsif ($batch_mode) {
     system("sbatch $batch");
     system("rm -f $batch");
 }
 else {
+    system("rm -f $batch") if ( -e $batch );
     system($system_cmd);
 }
-
-system("rm -f $passwd_file") if ( -e "$passwd_file" );
-system("rm -f $group_file") if ( -e "$group_file" );
 
 sub usage {
     print << "EOF";
