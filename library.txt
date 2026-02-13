@@ -6,11 +6,11 @@
       versions => ['1.8.0', '1.6.0', '1.4.0']
     },
     'tensorflow' => {
-      description => 'Deep learning framework',
+      description => 'End to end machine learning platform',
       versions => ['2.16.1', '2.13.0']
     },
     'torch' => {
-      description => 'Superpower machine learning library',
+      description => 'Optimized tensor library for deep learning using GPUs and CPUs.',
       versions => ['2.10.0', '2.4.0']
     }
   }

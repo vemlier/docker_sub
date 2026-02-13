@@ -73,8 +73,6 @@ for ( my $i = 0 ; $i < @ARGV ; $i++ ) {
 
         for my $library_name (@docker_images) {
             print "===============\n";
-            print $config->{libraries}{$library_name}{description}, "\n";
-            print "===============\n";
             print "$library_name: ";
 
             for my $library_version (
@@ -82,8 +80,10 @@ for ( my $i = 0 ; $i < @ARGV ; $i++ ) {
             {
                 print " $library_version ";
             }
-
-            print "\n===============\n\n";
+            print "\n===============\n";
+            print $config->{libraries}{$library_name}{description};
+            print "\n===============\n";
+	    print "\n";
         }
         exit 0;
 
