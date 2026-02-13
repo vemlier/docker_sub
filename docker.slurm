@@ -28,7 +28,10 @@ my $debug_mode;
 my $docker_cmd;
 my $registry = exists $ENV{'DEEPONE_REGISTRY'} ? $ENV{'DEEPONE_REGISTRY'} : undef;
 my $sbatch;
-my $batch           = "slurm.sub";
+my $batch = "slurm.sub";
+my $passwd_file = "passwd.temp";
+my $group_file = "group.temp";
+my $account_setting = "account.setting";
 my $jupyter_setting = "jupyter.txt";
 my $system_cmd;
 my @python_versions;
@@ -140,6 +143,8 @@ if ( !-f $library_information || !-r $library_information ) {
 
 $docker_cmd =
 "docker run --rm -v $pwd:$pwd -w $pwd --name \$SLURM_JOB_ID --hostname d_\$SLURMD_NODENAME ";
+# $docker_cmd .= "-v $pwd/$passwd_file:/etc/passwd -v $pwd/$group_file:/etc/group ";
+# For none shared file system
 $docker_cmd .= "-v /etc/passwd:/etc/passwd -v /etc/group:/etc/group ";
 $docker_cmd .= "--gpus $gpu_num "  if ( $gpu_num > 0 );
 $docker_cmd .= "-it "              if ( !defined $batch_mode );
@@ -201,6 +206,15 @@ else {
     $system_cmd .= "-w $host " if ( defined $host );
     $system_cmd .= "-n $cpu_num ";
     $system_cmd .= "--gres=$gpu_mode:$gpu_num " if ( $gpu_num > 0 );
+        open my $ACCOUNT, ">", $account_setting
+          or die "Cannot open $account_setting: $!";
+        print $ACCOUNT <<EOF;
+#!/usr/bin/env bash
+getent passwd > $passwd_file
+getent group > $group_file
+EOF
+        close $ACCOUNT;
+
     if ($jupyter_mode) {
         open my $JUPYTER, ">", $jupyter_setting
           or die "Cannot open $jupyter_setting: $!";
@@ -214,10 +228,14 @@ while [ ${#PORT} -lt 4 ]; do
 done
 EOF
         close $JUPYTER;
-        $system_cmd .=
-"--pty bash -c 'source $jupyter_setting && rm -f $jupyter_setting && $docker_cmd'";
+        # $system_cmd .= "--pty bash -c 'bash $account_setting && rm -f $account_setting && source $jupyter_setting && rm -f $jupyter_setting && $docker_cmd'";
+        # For none shared file system
+        $system_cmd .= "--pty bash -c 'source $jupyter_setting && rm -f $jupyter_setting && $docker_cmd'";
+      
     }
     else {
+        # $system_cmd .= "--pty bash -c 'bash $account_setting && rm -f $account_setting && $docker_cmd'";
+        # For none shared file system
         $system_cmd .= "--pty bash -c '$docker_cmd'";
     }
 }
@@ -234,6 +252,8 @@ EOF
 }
 
 $sbatch .= "\n";
+$sbatch .= "getent passwd > $passwd_file\n";
+$sbatch .= "getent group  > $group_file\n";
 $sbatch .= $docker_cmd;
 $sbatch .= "\n";
 
@@ -260,7 +280,7 @@ if ($debug_mode) {
     print $system_cmd, "\n" if ( defined $system_cmd );
     print "=====System command=====\n" if ( defined $system_cmd );
     print "\n";
-
+    system("rm -f $account_setting") if ( -e "$account_setting" );
 }
 elsif ($batch_mode) {
     system("sbatch $batch");
@@ -269,6 +289,9 @@ elsif ($batch_mode) {
 else {
     system($system_cmd);
 }
+
+system("rm -f $passwd_file") if ( -e "$passwd_file" );
+system("rm -f $group_file") if ( -e "$group_file" );
 
 sub usage {
     print << "EOF";
