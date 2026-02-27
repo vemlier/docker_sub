@@ -1,0 +1,91 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Getopt::Long qw(:config no_ignore_case);
+use FindBin qw($Bin $Script);
+
+my $script_path = "$Bin";
+my $pwd = $ENV{PWD};
+my $cpu_num = 1;
+my $gpu_num = exists $ENV{'DEEPONE_GPU_NUM'} ? $ENV{'DEEPONE_GPU_NUM'} : 1;
+my $user = $ENV{"USER"};
+my $docker_cmd;
+my $debug_mode;
+my $bsub;
+my $batch = "lsf.sub";
+my $run_script = "run.sh";
+my $queue;
+my $job_name = "myjob";
+my $gpu_mode = "exclusive_process";
+
+GetOptions(
+  'q|queue=s' => \$queue,
+  'J|job=s' => \$job_name,
+  'g|gpu=i' => \$gpu_num,
+  'n|ncpu=i' => \$cpu_num,
+  'd|debug' => \$debug_mode,
+  'h|help' => sub{ usage() }
+) or usage();
+
+$bsub .= "#!/usr/bin/env bash\n";
+$bsub .= "#BSUB -J \"$job_name\"\n";
+$bsub .= "#BSUB -q $queue\n" if (defined $queue);
+$bsub .= "#BSUB -n $gpu_num\n";
+$bsub .= "#BSUB -R \"span[ptile=1]\"\n";
+$bsub .= "#BSUB -gpu \"num=1:mode=$gpu_mode\"\n" if ($gpu_num > 0);
+$bsub .= "#BSUB -o %J.lslog\n";
+$bsub .= "#BSUB -e %J.lserror\n";
+$bsub .= "\n";
+
+$bsub .= << 'EOF';
+for host in $LSB_HOSTS
+do
+  echo "$host" >> hostfile
+  sleep 1
+done
+
+mpirun -np 2 -N 1 -hostfile hostfile --allow-run-as-root /bin/bash /root/docker_sub/run.sh
+sleep 3
+docker exec nccl bash /data/nccl-tests/run2node.sh
+mpirun -np 2 -N 1 -hostfile hostfile --allow-run-as-root docker rm -f nccl
+rm -f hostfile
+rm -f run.sh
+EOF
+
+# run.sh
+open my $RUN, ">$run_script" or die "Cannot open $run_script $!";
+print $RUN <<'EOF';
+#!/usr/bin/env bash
+
+docker run --ipc=host --ulimit memlock=-1 --network host --rm -d --gpus all -v /etc/ssh:/etc/ssh -v /root:/root -v /etc/hosts:/etc/hosts -v /usr/lib64:/usr/lib64 -v /etc/group:/etc/group -v /etc/passwd:/etc/passwd -v /data/nccl-tests:/data/nccl-tests -w /data/nccl-tests --hostname d${HOSTNAME} --name nccl nvidia/cuda:12.8.1-cudnn-devel-rockylinux8-test bash -c 'rm -rf /run/nologin && /usr/sbin/sshd -p 2222 && sleep infinity'
+EOF
+close $RUN;
+
+if ($debug_mode) {
+    open my $BSUB, ">$batch" or die "Cannot open $batch $!";
+    print $BSUB $bsub;
+    close $BSUB;
+} else {
+    open my $BSUB, "| bsub" or die "Cannot open $batch $!";
+    print $BSUB $bsub;
+    close $BSUB;
+}
+
+sub usage {
+    print << "EOF";
+=========================================================
+nccl.lsf 1.0
+=========================================================
+Usage: nccl.lsf [-d] [-g <gpu_num>] [-q <submit_queue>] "commnad"
+
+  -J <job name>      : Job name  ( Default: myjob)
+  -q <queue>         : Sumit queue
+  -g <gpu num>       : Number of GPU ( Default: 1, DEEPONE_GPU_NUM )
+  -d                 : Run debug mode
+
+=========================================================
+EOF
+
+    exit 0;
+}
