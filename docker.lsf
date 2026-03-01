@@ -144,7 +144,7 @@ if ( !-f $library_information || !-r $library_information ) {
 }
 
 $docker_cmd =
-"docker run --rm -v $pwd:$pwd -w $pwd --name \$LSB_JOBID --hostname d_\$HOSTNAME ";
+"docker run --rm -v $pwd:$pwd -w $pwd --name \$LSB_JOBID --hostname d-\$HOSTNAME ";
 $docker_cmd .=
   "-v $pwd/$passwd_file:/etc/passwd -v $pwd/$group_file:/etc/group ";
 $docker_cmd .= "--gpus $gpu_num "  if ( $gpu_num > 0 );
@@ -152,8 +152,8 @@ $docker_cmd .= "-it "              if ( !defined $batch_mode );
 $docker_cmd .= "-p \$PORT:\$PORT " if ( defined $jupyter_mode );
 $docker_cmd .= "--user \$(id -u):\$(id -g) ";
 
-# Manual Port Option
-#$docker_cmd .= "-p 8888:\$PORT "    if ( defined $jupyter_mode );
+# Manual port option
+# $docker_cmd .= "-p 8888:\$PORT "    if ( defined $jupyter_mode );
 if ($registry) {
     $docker_cmd .= "$registry/$docker_image ";
 }

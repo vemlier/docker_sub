@@ -142,7 +142,7 @@ if ( !-f $library_information || !-r $library_information ) {
 }
 
 $docker_cmd =
-"docker run --rm -v $pwd:$pwd -w $pwd --name \$SLURM_JOB_ID --hostname d_\$SLURMD_NODENAME ";
+"docker run --rm -v $pwd:$pwd -w $pwd --name \$SLURM_JOB_ID --hostname d-\$SLURMD_NODENAME ";
 # $docker_cmd .= "-v $pwd/$passwd_file:/etc/passwd -v $pwd/$group_file:/etc/group ";
 # For none shared file system
 $docker_cmd .= "-v /etc/passwd:/etc/passwd -v /etc/group:/etc/group ";
