@@ -11,10 +11,7 @@ my $pwd                 = $ENV{"PWD"};
 my $user                = $ENV{"USER"};
 my $hostname            = $ENV{"HOSTNAME"};
 my $library_information = "$Bin/library.txt";
-my $docker_image =
-  exists $ENV{'DEEPONE_DOCKER_IMAGE'}
-  ? $ENV{'DEEPONE_DOCKER_IMAGE'}
-  : "sklearn:1.6.1";
+my $docker_image = $ENV{'DEEPONE_DOCKER_IMAGE'} if ( $ENV{'DEEPONE_DOCKER_IMAGE'} );
 my $job_name = "myjob";
 my $queue;
 my $host;
@@ -142,6 +139,8 @@ for ( my $i = 0 ; $i < @ARGV ; $i++ ) {
 if ( !-f $library_information || !-r $library_information ) {
     die "$library_information does not exist\n";
 }
+
+die "Docker image not detected. Use -i option" if ( ! $docker_image );
 
 $docker_cmd =
 "docker run --rm -v $pwd:$pwd -w $pwd --name \$LSB_JOBID --hostname d-\$HOSTNAME ";
